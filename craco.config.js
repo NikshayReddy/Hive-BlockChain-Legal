@@ -5,21 +5,21 @@ module.exports = {
         configure: {
             resolve: {
                 fallback: {
-                    "assert": require.resolve("assert/"),
                     "crypto": require.resolve("crypto-browserify"),
                     "stream": require.resolve("stream-browserify"),
-                    "buffer": require.resolve("buffer/"),
-                    "process": require.resolve("process/browser"),
-                    "vm": require.resolve("vm-browserify")
+                    "assert": require.resolve("assert/"),
+                    "http": require.resolve("stream-http"),
+                    "https": require.resolve("https-browserify"),
+                    "os": require.resolve("os-browserify/browser"),
+                    "url": require.resolve("url/")
                 }
-            },
-            plugins: [
+            }
+        },
+        plugins: {
+            add: [
                 new webpack.ProvidePlugin({
-                    Buffer: ['buffer', 'Buffer'],
-                    process: 'process/browser'
-                }),
-                new webpack.DefinePlugin({
-                    'process.env.NODE_DEBUG': JSON.stringify(process.env.NODE_DEBUG)
+                    process: 'process/browser',
+                    Buffer: ['buffer', 'Buffer']
                 })
             ]
         }
