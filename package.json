@@ -35,8 +35,9 @@
     "tls": false
   },
   "scripts": {
+    "dev": "craco start",
     "start": "craco start",
-    "build": "craco build",
+    "build": "CI=false craco build",
     "test": "craco test",
     "eject": "react-scripts eject"
   },
