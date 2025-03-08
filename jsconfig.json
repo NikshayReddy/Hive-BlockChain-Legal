@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "baseUrl": "src",
+    "paths": {
+      "*": ["*"]
+    },
+    "sourceMap": false,
+    "checkJs": false
+  },
+  "exclude": ["node_modules"]
+} 
