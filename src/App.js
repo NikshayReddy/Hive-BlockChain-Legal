@@ -377,42 +377,25 @@ function App() {
   return (
     <Router>
       <div className="app">
+        <Navigation />
         <Routes>
           <Route path="/" element={<Login />} />
-          <Route path="/callback" element={<HivesignerCallback />} />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <>
-                  <Navigation />
-                  <Dashboard />
-                </>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/blog"
-            element={
-              <ProtectedRoute>
-                <>
-                  <Navigation />
-                  <Blog />
-                </>
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/trials"
-            element={
-              <ProtectedRoute>
-                <>
-                  <Navigation />
-                  <Trials />
-                </>
-              </ProtectedRoute>
-            }
-          />
+          <Route path="/dashboard" element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/blog" element={
+            <ProtectedRoute>
+              <Blog />
+            </ProtectedRoute>
+          } />
+          <Route path="/trials" element={
+            <ProtectedRoute>
+              <Trials />
+            </ProtectedRoute>
+          } />
+          <Route path="/hivesigner/callback" element={<HivesignerCallback />} />
         </Routes>
       </div>
     </Router>

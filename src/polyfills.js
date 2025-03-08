@@ -1,30 +1,46 @@
 import { Buffer } from 'buffer';
-import process from 'process';
 
+// Initialize global process
+const processPolyfill = {
+    env: { NODE_DEBUG: false },
+    version: '',
+    nextTick: function(cb) { setTimeout(cb, 0); },
+    browser: true
+};
+
+// Safe global assignments
 if (typeof window !== 'undefined') {
-    // Safely assign Buffer
-    if (!window.Buffer) {
-        window.Buffer = Buffer;
-    }
+    try {
+        // Buffer polyfill
+        if (!window.Buffer) {
+            window.Buffer = Buffer;
+        }
 
-    // Safely assign process
-    if (!window.process) {
-        window.process = process;
-    }
+        // Process polyfill
+        if (!window.process) {
+            window.process = processPolyfill;
+        }
 
-    // Safely assign global
-    if (typeof window.global === 'undefined') {
-        window.global = window;
+        // Global polyfill
+        if (typeof window.global === 'undefined') {
+            window.global = window;
+        }
+    } catch (error) {
+        console.warn('Polyfill initialization warning:', error);
     }
 }
 
-// Ensure process.env exists and has required properties
-if (!process.env) {
-    process.env = {};
+// Ensure global process exists
+if (typeof global !== 'undefined' && !global.process) {
+    global.process = processPolyfill;
 }
 
-// Set default values for required environment variables
-process.env.NODE_DEBUG = process.env.NODE_DEBUG || false;
+// Export polyfills
+export const polyfills = {
+    Buffer,
+    process: processPolyfill,
+    global: typeof window !== 'undefined' ? window : (typeof global !== 'undefined' ? global : {})
+};
 
 // Handle vm polyfill safely
 try {
@@ -34,11 +50,4 @@ try {
     }
 } catch (error) {
     console.warn('vm-browserify polyfill not loaded:', error);
-}
-
-// Export for use in other files
-export const polyfills = {
-    Buffer,
-    process,
-    global: typeof window !== 'undefined' ? window : global
-}; 
+} 
