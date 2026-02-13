@@ -14,7 +14,7 @@ const Trials = () => {
     const [showPremiumModal, setShowPremiumModal] = useState(false);
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
-    const [premiumAmount] = useState(1); // Premium subscription amount in HIVE
+    const [premiumAmount] = useState(100); // Premium subscription amount in HIVE
     const [username, setUsername] = useState('');
     const [userBalance, setUserBalance] = useState('0.000');
 
@@ -31,10 +31,14 @@ const Trials = () => {
         try {
             const accounts = await client.database.getAccounts([username]);
             if (accounts && accounts[0]) {
-                setUserBalance(accounts[0].balance);
+                const balance = accounts[0].balance;
+                setUserBalance(balance);
+                return balance;
             }
+            return '0.000';
         } catch (error) {
             console.error('Error fetching balance:', error);
+            return '0.000';
         }
     };
 
@@ -95,8 +99,17 @@ const Trials = () => {
                         localStorage.setItem('premium_user', 'true');
                         setMessage('Premium subscription activated successfully!');
                         setShowPremiumModal(false);
+                        fetchUserBalance(username); // Update balance
                     } else {
-                        setMessage('Failed to process premium subscription');
+                        let errorMsg = 'Failed to process premium subscription';
+                        if (response.message && typeof response.message === 'string') {
+                            if (response.message.includes('User rejected')) {
+                                errorMsg = 'Transaction cancelled by user';
+                            } else {
+                                errorMsg += ': ' + response.message;
+                            }
+                        }
+                        setMessage(errorMsg);
                     }
                     setLoading(false);
                 }
@@ -146,9 +159,18 @@ const Trials = () => {
                 response => {
                     if (response.success) {
                         setMessage('Trial access granted successfully!');
+                        fetchUserBalance(loggedInUser); // Update balance
                         // Add logic to grant access to the case
                     } else {
-                        setMessage('Failed to process trial payment');
+                        let errorMsg = 'Failed to process trial payment';
+                        if (response.message && typeof response.message === 'string') {
+                            if (response.message.includes('User rejected')) {
+                                errorMsg = 'Transaction cancelled by user';
+                            } else {
+                                errorMsg += ': ' + response.message;
+                            }
+                        }
+                        setMessage(errorMsg);
                     }
                     setLoading(false);
                 }
@@ -224,6 +246,11 @@ const Trials = () => {
                 </div>
             )}
 
+            {userBalance && (
+                <div className="user-balance">
+                    Balance: {userBalance}
+                </div>
+            )}
             {message && (
                 <div className={`message ${message.includes('success') ? 'success' : 'error'}`}>
                     {message}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Client } from '@hiveio/dhive';
 import { useNavigate } from 'react-router-dom';
 import './Blog.css';
@@ -34,7 +34,6 @@ const Blog = () => {
         category: 'legal' 
     });
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
     const [posts, setPosts] = useState([]);
     const [showCreatePost, setShowCreatePost] = useState(false);
     const [showCaseDetails, setShowCaseDetails] = useState(false);
@@ -48,9 +47,7 @@ const Blog = () => {
     const [showDonateModal, setShowDonateModal] = useState(null);
     const [voteWeight, setVoteWeight] = useState(10000);
     const [showVoteSlider, setShowVoteSlider] = useState(false);
-    const [selectedPostForVote, setSelectedPostForVote] = useState(null);
     const navigate = useNavigate();
-    const [username, setUsername] = useState(localStorage.getItem("hive_username"));
     const [userData, setUserData] = useState(null);
     const [isLoggedIn, setIsLoggedIn] = useState(false);
     const [pagination, setPagination] = useState({
@@ -64,13 +61,13 @@ const Blog = () => {
 
     // Function to create a valid permlink
     const createPermlink = (title) => {
-        if (!title) return 'post';
+        if (!title) return 'post-' + Date.now();
         return title
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, '-')
             .replace(/^-+|-+$/g, '')
             .replace(/-+/g, '-')
-            || 'post';
+            + '-' + Date.now();
     };
 
     const handleInputChange = (e) => {
@@ -81,13 +78,15 @@ const Blog = () => {
         }));
     };
 
-    useEffect(() => {
-        checkLoginStatus();
-        fetchPosts();
+    // Function to check login status
+    const handleLogout = useCallback(() => {
+        localStorage.removeItem('hive_username');
+        setUserData(null);
+        setIsLoggedIn(false);
+        setMessage('Logged out successfully');
     }, []);
 
-    // Function to check login status
-    const checkLoginStatus = async () => {
+    const checkLoginStatus = useCallback(async () => {
         const username = localStorage.getItem('hive_username');
         if (username) {
             try {
@@ -103,7 +102,7 @@ const Blog = () => {
                 handleLogout();
             }
         }
-    };
+    }, [handleLogout]);
 
     // Function to handle login
     const handleLogin = async () => {
@@ -144,19 +143,10 @@ const Blog = () => {
         }
     };
 
-    // Function to handle logout
-    const handleLogout = () => {
-        localStorage.removeItem('hive_username');
-        setUserData(null);
-        setIsLoggedIn(false);
-        setMessage('Logged out successfully');
-    };
-
     // Optimized fetchPosts function
-    const fetchPosts = async (pageNum = 1) => {
+    const fetchPosts = useCallback(async (pageNum = 1) => {
         try {
             setLoading(true);
-            setError(null);
 
             // Build query based on pagination
             const query = {
@@ -235,19 +225,24 @@ const Blog = () => {
                     hasMore: result.length === 10
                 }));
             } else {
-                setError('Failed to fetch posts: Invalid response format');
+                setMessage('Failed to fetch posts: Invalid response format');
                 setPosts([]);
             }
         } catch (error) {
             console.error('Error fetching posts:', error);
-            setError(error.message || 'Failed to fetch posts');
+            setMessage(error.message || 'Failed to fetch posts');
             if (pagination.currentPage === 1) {
                 setPosts([]);
             }
         } finally {
             setLoading(false);
         }
-    };
+    }, [posts, pagination.currentPage]);
+
+    useEffect(() => {
+        checkLoginStatus();
+        fetchPosts();
+    }, [checkLoginStatus, fetchPosts]);
 
     // Add scroll handler for infinite loading
     useEffect(() => {
@@ -264,25 +259,22 @@ const Blog = () => {
 
         window.addEventListener('scroll', handleScroll);
         return () => window.removeEventListener('scroll', handleScroll);
-    }, [pagination.hasMore, loading, pagination.currentPage]);
+    }, [pagination.hasMore, loading, pagination.currentPage, fetchPosts]);
 
     // Enhanced createPost function
     const createPost = async (e) => {
         e.preventDefault();
         if (!isLoggedIn) {
-            setError('Please login first');
             setMessage('Please login first');
             return;
         }
 
         if (!newPost.title || !newPost.content) {
-            setError('Please fill in all required fields');
             setMessage('Please fill in all required fields');
             return;
         }
 
         try {
-            setLoading(true);
             const permlink = createPermlink(newPost.title);
 
             // Create the post operation
@@ -304,82 +296,26 @@ const Blog = () => {
                 ]
             ];
 
-            // Request signature and broadcast with retry logic
-            const broadcastWithRetry = async (retries = 3) => {
-                return new Promise((resolve, reject) => {
-                    window.hive_keychain.requestSignBuffer(
-                        userData.name,
-                        `Create new case: ${newPost.title}`,
-                        'Posting',
-                        async (response) => {
-                            if (response.success) {
-                                window.hive_keychain.requestBroadcast(
-                                    userData.name,
-                                    operations,
-                                    'posting',
-                                    async (broadcastResponse) => {
-                                        if (broadcastResponse.success) {
-                                            // Wait for transaction to be confirmed
-                                            try {
-                                                await new Promise(resolve => setTimeout(resolve, 2000));
-                                                const result = await client.database.getContent(userData.name, permlink);
-                                                if (result) {
-                                                    resolve(broadcastResponse);
-                                                } else {
-                                                    if (retries > 0) {
-                                                        setTimeout(() => {
-                                                            broadcastWithRetry(retries - 1)
-                                                                .then(resolve)
-                                                                .catch(reject);
-                                                        }, 2000);
-                                                    } else {
-                                                        reject(new Error('Transaction not confirmed after multiple attempts'));
-                                                    }
-                                                }
-                                            } catch (error) {
-                                                if (retries > 0) {
-                                                    setTimeout(() => {
-                                                        broadcastWithRetry(retries - 1)
-                                                            .then(resolve)
-                                                            .catch(reject);
-                                                    }, 2000);
-                                                } else {
-                                                    reject(error);
-                                                }
-                                            }
-                                        } else {
-                                            reject(new Error(broadcastResponse.message || 'Broadcast failed'));
-                                        }
-                                    }
-                                );
-                            } else {
-                                reject(new Error(response.message || 'Failed to sign'));
-                            }
-                        }
-                    );
-                });
-            };
-
-            await broadcastWithRetry();
-            setMessage('Post created successfully!');
-            setShowCreatePost(false);
-            setNewPost({ title: '', content: '', tags: '', category: 'legal' });
-            fetchPosts();
+            // Request broadcast
+            window.hive_keychain.requestBroadcast(
+                userData.name,
+                operations,
+                'posting',
+                (response) => {
+                    if (response.success) {
+                        setMessage('Post created successfully!');
+                        setShowCreatePost(false);
+                        setNewPost({ title: '', content: '', tags: '', category: 'legal' });
+                        fetchPosts();
+                    } else {
+                        setMessage('Failed to create post: ' + (response.message || 'Unknown error'));
+                    }
+                    setLoading(false);
+                }
+            );
         } catch (err) {
             console.error('Error creating post:', err);
-            let errorMessage = 'Error creating post: ';
-            if (err.message.includes('Failed to fetch')) {
-                errorMessage += 'Network error. Please check your connection and try again.';
-            } else if (err.message.includes('timeout')) {
-                errorMessage += 'Request timed out. Please try again.';
-            } else if (err.message.includes('posting')) {
-                errorMessage += 'Posting key is not available. Please check your Hive Keychain permissions.';
-            } else {
-                errorMessage += err.message || 'Unknown error';
-            }
-            setError(errorMessage);
-            setMessage(errorMessage);
-        } finally {
+            setMessage('Error creating post: ' + (err.message || 'Unknown error'));
             setLoading(false);
         }
     };
@@ -390,73 +326,54 @@ const Blog = () => {
             return;
         }
 
-        try {
-            setLoading(true);
-            const username = localStorage.getItem('hive_username');
-            
-            if (!username) {
-                setMessage('Please log in first');
-                setLoading(false);
-                return;
-            }
-
-            const operations = [
-                ['vote', {
-                    voter: username,
-                    author: post.author,
-                    permlink: post.permlink,
-                    weight: voteWeight
-                }]
-            ];
-
-            // Use retryOperation for broadcasting
-            await retryOperation(() => {
-                return new Promise((resolve, reject) => {
-                    window.hive_keychain.requestBroadcast(
-                        username,
-                        operations,
-                        'posting',
-                        async (response) => {
-                            if (response.success) {
-                                // Wait for transaction to be confirmed
-                                try {
-                                    await new Promise(resolve => setTimeout(resolve, 2000));
-                                    const result = await client.database.getContent(post.author, post.permlink);
-                                    if (result) {
-                                        setMessage('Vote successful!');
-                                        setShowVoteSlider(false);
-                                        setSelectedPostForVote(null);
-                                        fetchPosts(); // Refresh posts to show updated vote count
-                                        resolve();
-                                    } else {
-                                        reject(new Error('Transaction not confirmed'));
-                                    }
-                                } catch (error) {
-                                    reject(error);
-                                }
-                            } else {
-                                reject(new Error(response.message || 'Broadcast failed'));
-                            }
-                            setLoading(false);
-                        }
-                    );
-                });
-            });
-        } catch (error) {
-            console.error('Error voting:', error);
-            let errorMessage = 'Error voting: ';
-            if (error.message.includes('Failed to fetch')) {
-                errorMessage += 'Network error. Please check your connection and try again.';
-            } else if (error.message.includes('timeout')) {
-                errorMessage += 'Request timed out. Please try again.';
-            } else if (error.message.includes('posting')) {
-                errorMessage += 'Posting key is not available. Please check your Hive Keychain permissions.';
-            } else {
-                errorMessage += error.message;
-            }
-            setMessage(errorMessage);
-            setLoading(false);
+        const username = localStorage.getItem('hive_username');
+        if (!username) {
+            setMessage('Please log in first');
+            return;
         }
+
+        setLoading(true);
+
+        const operations = [
+            ['vote', {
+                voter: username,
+                author: post.author,
+                permlink: post.permlink,
+                weight: parseInt(voteWeight)
+            }]
+        ];
+
+        window.hive_keychain.requestBroadcast(
+            username,
+            operations,
+            'posting',
+            (response) => {
+                if (response.success) {
+                    setMessage('Vote successful!');
+                    setShowVoteSlider(false);
+                    // Add a delay before refreshing posts
+                    setTimeout(() => {
+                        fetchPosts();
+                        setLoading(false);
+                    }, 3000);
+                } else {
+                    let errorMessage = 'Failed to vote: ';
+                    if (response.message && typeof response.message === 'string') {
+                        if (response.message.includes('User rejected')) {
+                            errorMessage += 'Transaction cancelled';
+                        } else if (response.message.includes('already voted')) {
+                            errorMessage += 'You have already voted on this post';
+                        } else {
+                            errorMessage += response.message;
+                        }
+                    } else {
+                        errorMessage += 'Unknown error';
+                    }
+                    setMessage(errorMessage);
+                    setLoading(false);
+                }
+            }
+        );
     };
 
     // Add this function to fetch user balance
@@ -755,7 +672,7 @@ const Blog = () => {
                                 <button 
                                     type="submit"
                                     className="submit-button"
-                                    disabled={loading}
+                                    disabled={!isLoggedIn || !newPost.title || !newPost.content}
                                 >
                                     {loading ? (
                                         <>
@@ -845,7 +762,6 @@ const Blog = () => {
                                 onClick={() => {
                                     setShowCaseDetails(false);
                                     setShowVoteSlider(false);
-                                    setSelectedPostForVote(null);
                                 }}
                             >
                                 <i className="fas fa-times"></i>
@@ -894,7 +810,6 @@ const Blog = () => {
                                     className="action-button vote"
                                     onClick={() => {
                                         setShowVoteSlider(true);
-                                        setSelectedPostForVote(selectedCase);
                                     }}
                                 >
                                     <i className="fas fa-thumbs-up"></i>
@@ -919,7 +834,6 @@ const Blog = () => {
                                             className="cancel-button"
                                             onClick={() => {
                                                 setShowVoteSlider(false);
-                                                setSelectedPostForVote(null);
                                                 setVoteWeight(10000);
                                             }}
                                         >
@@ -928,12 +842,12 @@ const Blog = () => {
                                         <button 
                                             className="submit-button"
                                             onClick={() => handleVote(selectedCase)}
-                                            disabled={loading}
+                                            disabled={!isLoggedIn}
                                         >
                                             {loading ? (
                                                 <>
                                                     <span className="loading"></span>
-                                                    Processing...
+                                                    Voting...
                                                 </>
                                             ) : (
                                                 <>

@@ -59,7 +59,8 @@ const Dashboard = () => {
   const [transferMessage, setTransferMessage] = useState('');
   const [showTransfer, setShowTransfer] = useState(false);
   const [balance, setBalance] = useState(null);
-  const [stats, setStats] = useState({
+  const [isLoading, setIsLoading] = useState(false);
+  const [stats] = useState({
     totalPosts: 0,
     totalEarnings: 0,
     activeCases: 0,
@@ -67,7 +68,6 @@ const Dashboard = () => {
   });
   const navigate = useNavigate();
   const username = localStorage.getItem("hive_username");
-  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     // Fetch user's HIVE balance and stats
@@ -134,57 +134,48 @@ const Dashboard = () => {
         return;
       }
 
-      // Request signature for transfer
-      const message = `Transfer ${amount} HIVE to ${transferTo}`;
-      window.hive_keychain.requestSignBuffer(
-        username,
-        message,
-        'Active',
-        async (response) => {
-          if (response.success) {
-            const operations = [
-              ['transfer', {
-                from: username,
-                to: transferTo,
-                amount: `${amount.toFixed(3)} HIVE`,
-                memo: 'Transfer from Legal X Suits'
-              }]
-            ];
+      // Request broadcast directly
+      const operations = [
+        ['transfer', {
+          from: username,
+          to: transferTo,
+          amount: `${amount.toFixed(3)} HIVE`,
+          memo: 'Transfer from Legal X Suits'
+        }]
+      ];
 
-            window.hive_keychain.requestBroadcast(
-              username,
-              operations,
-              'active',
-              response => {
-                if (response.success) {
-                  setTransferMessage('Transfer successful!');
-                  setTransferAmount('');
-                  setTransferTo('');
-                  setShowTransfer(false);
-                  // Refresh balance after transfer
-                  setTimeout(() => {
-                    window.location.reload();
-                  }, 2000);
-                } else {
-                  let errorMessage = 'Transfer failed: ';
-                  if (response.message.includes('User rejected')) {
-                    errorMessage += 'Transaction was cancelled';
-                  } else if (response.message.includes('keychain')) {
-                    errorMessage += 'Hive Keychain is not unlocked. Please unlock it and try again.';
-                  } else if (response.message.includes('insufficient')) {
-                    errorMessage += 'Insufficient funds or power';
-                  } else {
-                    errorMessage += response.message;
-                  }
-                  setTransferMessage(errorMessage);
-                }
-                setIsLoading(false);
-              }
-            );
+      window.hive_keychain.requestBroadcast(
+        username,
+        operations,
+        'active',
+        response => {
+          if (response.success) {
+            setTransferMessage('Transfer successful!');
+            setTransferAmount('');
+            setTransferTo('');
+            setShowTransfer(false);
+            // Refresh balance after transfer
+            setTimeout(() => {
+              window.location.reload();
+            }, 2000);
           } else {
-            setTransferMessage('Failed to sign transfer request');
-            setIsLoading(false);
+            let errorMessage = 'Transfer failed: ';
+            if (response.message && typeof response.message === 'string') {
+              if (response.message.includes('User rejected')) {
+                errorMessage += 'Transaction was cancelled';
+              } else if (response.message.includes('keychain')) {
+                errorMessage += 'Hive Keychain is not unlocked. Please unlock it and try again.';
+              } else if (response.message.includes('insufficient')) {
+                errorMessage += 'Insufficient funds or power';
+              } else {
+                errorMessage += response.message;
+              }
+            } else {
+              errorMessage += 'Unknown error';
+            }
+            setTransferMessage(errorMessage);
           }
+          setIsLoading(false);
         }
       );
     } catch (error) {
@@ -377,25 +368,42 @@ function App() {
   return (
     <Router>
       <div className="app">
-        <Navigation />
         <Routes>
           <Route path="/" element={<Login />} />
-          <Route path="/dashboard" element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/blog" element={
-            <ProtectedRoute>
-              <Blog />
-            </ProtectedRoute>
-          } />
-          <Route path="/trials" element={
-            <ProtectedRoute>
-              <Trials />
-            </ProtectedRoute>
-          } />
-          <Route path="/hivesigner/callback" element={<HivesignerCallback />} />
+          <Route path="/callback" element={<HivesignerCallback />} />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <>
+                  <Navigation />
+                  <Dashboard />
+                </>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/blog"
+            element={
+              <ProtectedRoute>
+                <>
+                  <Navigation />
+                  <Blog />
+                </>
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/trials"
+            element={
+              <ProtectedRoute>
+                <>
+                  <Navigation />
+                  <Trials />
+                </>
+              </ProtectedRoute>
+            }
+          />
         </Routes>
       </div>
     </Router>

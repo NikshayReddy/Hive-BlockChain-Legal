@@ -5,24 +5,31 @@ module.exports = {
         configure: {
             resolve: {
                 fallback: {
+                    "assert": require.resolve("assert/"),
                     "crypto": require.resolve("crypto-browserify"),
                     "stream": require.resolve("stream-browserify"),
-                    "assert": require.resolve("assert/"),
-                    "http": require.resolve("stream-http"),
-                    "https": require.resolve("https-browserify"),
-                    "os": require.resolve("os-browserify/browser"),
-                    "url": require.resolve("url/"),
-                    "vm": require.resolve("vm-browserify"),
                     "buffer": require.resolve("buffer/"),
-                    "process": require.resolve("process/browser")
+                    "process": require.resolve("process/browser"),
+                    "vm": require.resolve("vm-browserify")
                 }
-            }
-        },
-        plugins: {
-            add: [
+            },
+            module: {
+                rules: [
+                    {
+                        test: /\.m?js$/,
+                        enforce: 'pre',
+                        use: ['source-map-loader'],
+                        exclude: [/jsbi/],
+                    },
+                ],
+            },
+            ignoreWarnings: [
+                /Failed to parse source map/,
+            ],
+            plugins: [
                 new webpack.ProvidePlugin({
-                    process: 'process/browser',
-                    Buffer: ['buffer', 'Buffer']
+                    Buffer: ['buffer', 'Buffer'],
+                    process: 'process/browser'
                 }),
                 new webpack.DefinePlugin({
                     'process.env.NODE_DEBUG': JSON.stringify(process.env.NODE_DEBUG)

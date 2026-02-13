@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Client } from "@hiveio/dhive";
 import './Login.css';
 
@@ -44,13 +44,7 @@ export default function Login() {
         broadcast: false
     });
 
-    // Check for Hive Keychain and blockchain connection
-    useEffect(() => {
-        checkKeychain();
-        checkConnection();
-    }, []);
-
-    const checkKeychain = async () => {
+    const checkKeychain = useCallback(async () => {
         if (window.hive_keychain) {
             setIsKeychainAvailable(true);
             setStatus(prev => ({ ...prev, keychain: true }));
@@ -60,9 +54,9 @@ export default function Login() {
             setMessage("Waiting for Hive Keychain...");
             setTimeout(checkKeychain, 500);
         }
-    };
+    }, []);
 
-    const checkConnection = async () => {
+    const checkConnection = useCallback(async () => {
         try {
             // Use retryOperation for connection check
             await retryOperation(async () => {
@@ -74,7 +68,13 @@ export default function Login() {
         } catch (err) {
             setMessage("Error connecting to Hive blockchain: " + err.message);
         }
-    };
+    }, []);
+
+    // Check for Hive Keychain and blockchain connection
+    useEffect(() => {
+        checkKeychain();
+        checkConnection();
+    }, [checkKeychain, checkConnection]);
 
     // Function for Hive Keychain Login
     const loginWithKeychain = async () => {
