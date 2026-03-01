@@ -21,6 +21,16 @@
     "vm-browserify": "^1.1.2",
     "web-vitals": "^2.1.4"
   },
+  "overrides": {
+      "minimatch": "^9.0.3",
+      "jsonpath": "^1.1.1",
+      "serialize-javascript": "^6.0.2",
+      "nth-check": "^2.0.1",
+      "postcss": "^8.4.31",
+      "ajv": "^6.12.6",
+      "bn.js": "^5.2.1",
+      "elliptic": "^6.5.7"
+    },
   "scripts": {
     "start": "craco start",
     "build": "craco build",
