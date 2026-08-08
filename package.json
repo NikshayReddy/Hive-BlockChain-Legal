@@ -29,7 +29,8 @@
       "postcss": "^8.4.31",
       "ajv": "^6.12.6",
       "bn.js": "^5.2.1",
-      "elliptic": "^6.5.7"
+      "elliptic": "^6.5.7",
+      "fast-uri": "^3.1.5"
     },
   "scripts": {
     "start": "craco start",
